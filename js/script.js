@@ -4,11 +4,17 @@ const B = L.latLng(55.741647, 37.604783); // верх-правый
 const C = L.latLng(55.742281, 37.600060); // низ-левый
 const D = L.latLng(55.740682, 37.603843); // реальный низ-правый
 
-const planBounds = L.latLngBounds([A, D]);
+//const planBounds = L.latLngBounds([A, D]); // больше не нужно
 
 const map = L.map('map');
-map.fitBounds( L.latLngBounds([A, D]), {padding:[60,60]} ); // 60px поля
 
+// Вычисляем центр (для примера)
+const centerLat = (A.lat + B.lat + C.lat + D.lat) / 4;
+const centerLng = (A.lng + B.lng + C.lng + D.lng) / 4;
+
+map.setView([centerLat, centerLng], 17); // Настраиваем вид на основе данных
+
+// map.fitBounds( L.latLngBounds([A, D]), {padding:[60,60]} ); // 60px поля  // можно убрать, если setView
 
 // подложка
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
