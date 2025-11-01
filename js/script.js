@@ -1,27 +1,37 @@
-// карта
-const map = L.map('map').setView([55.7717, 37.5899], 17);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  {maxZoom:19, attribution:'© OSM'}
-).addTo(map);
+// -------- контрольные точки генплана -----------
+const A = L.latLng(55.743076, 37.600931); // верх-левый
+const B = L.latLng(55.741647, 37.604783); // верх-правый
+const C = L.latLng(55.742281, 37.600060); // низ-левый
+const D = L.latLng(C.lat, B.lng);          // низ-правый
 
-// оверлей-генплан
-const bounds = [[55.743079,37.600941],[55.740674,37.603854]]; // NW & SE
-L.imageOverlay('images/plan.jpg', bounds).addTo(map);
+const planBounds = L.latLngBounds([A, D]);
 
-// кастом-иконка (можно стандартную)
+const map = L.map('map');
+map.fitBounds(planBounds, {padding:[30,30]});
+
+// подложка
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+  maxZoom:19,
+  attribution:'© OSM, Carto'
+}).addTo(map);
+
+// повернутый оверлей
+L.imageOverlay.rotated('images/plan.jpg', A, B, C, {opacity:0.8}).addTo(map);
+
+// -------- маркер-иконка ----------
 const blueIcon = L.icon({
-  iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 });
 
-// точки
+// -------- точки из GeoJSON ----------
 fetch('data/points.geojson')
-  .then(r=>r.json())
-  .then(json=>{
-    L.geoJSON(json,{
-      pointToLayer:(_, latlng)=>L.marker(latlng,{icon:blueIcon}),
-      onEachFeature:(f, layer)=>{
-        const p=f.properties;
+  .then(r => r.json())
+  .then(json => {
+    L.geoJSON(json, {
+      pointToLayer: (_, latlng) => L.marker(latlng, { icon: blueIcon }),
+      onEachFeature: (f, layer) => {
+        const p = f.properties;
         layer.bindPopup(
           `<b>${p.name}</b><br>
            <img class="popup-img" src="${p.img}"><br>
@@ -29,4 +39,4 @@ fetch('data/points.geojson')
         );
       }
     }).addTo(map);
-});
+  });
