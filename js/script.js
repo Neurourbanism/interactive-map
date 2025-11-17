@@ -1,29 +1,46 @@
-/* ===== главные переменные ===== */
-const layers = ['genplan','transport'];
-const cats   = ['buildings','landscape'];
+/* ===== карта и подложки (EPSG:4326) ===== */
 
-/* ===== карта и подложки ===== */
-const bounds = L.latLngBounds(
-  [55.7407158302922,37.60009626314388],
-  [55.74309207410261,37.604669304174124]
+/* bounds участка-1 */
+const b1 = L.latLngBounds(
+  [43.4106095120386968, 39.95101101168743],
+  [43.4173891758608832, 39.96542148920572]
 );
 
-const map = L.map('map').fitBounds(bounds,{padding:[60,60]});
+/* bounds участка-2 */
+const b2 = L.latLngBounds(
+  [43.395917235035576 , 39.98298856123352],
+  [43.404276445202839 , 39.99223406925298]
+);
+
+const map = L.map('map').fitBounds(b1,{padding:[40,40]});
+
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
   {maxZoom:19, attribution:'© OSM, Carto'}).addTo(map);
 
-const raster = {                               // ← объявляем ОДИН раз
-  genplan  : L.imageOverlay('images/plan_georeferenced_finalSmall.webp',  bounds,{opacity:.8}),
-  transport: L.imageOverlay('images/plan_georeferenced_blackSmall.webp', bounds,{opacity:.7})
-};
-raster.genplan.addTo(map);                      // стартовая подложка
-let activeLayer = 'genplan';
+/* --- overlay-файлы --- */
+const mp1 = L.imageOverlay('images/Masterplan1New.webp', b1,{opacity:.8});
+const tr1 = L.imageOverlay('images/Transport1New.webp',  b1,{opacity:.7});
+const mp2 = L.imageOverlay('images/Masterplan2.webp',    b2,{opacity:.8});
+const tr2 = L.imageOverlay('images/Transport2.webp',     b2,{opacity:.7});
 
-/* ---------- контрол «Слои» ---------- */
+/* отдельные группы для чекбоксов */
+const gen1 = L.layerGroup([mp1]),
+      gen2 = L.layerGroup([mp2]),
+      trn1 = L.layerGroup([tr1]),
+      trn2 = L.layerGroup([tr2]);
+
+/* показываем генплан-1 при загрузке */
+gen1.addTo(map);
+
+/* контрол «Слои / Участки» (теперь чекбоксы) */
 L.control.layers(
-  { 'Генплан'  : raster.genplan,
-    'Транспорт': raster.transport },
   null,
+  {
+    'Участок 1 — генплан'  : gen1,
+    'Участок 1 — транспорт': trn1,
+    'Участок 2 — генплан'  : gen2,
+    'Участок 2 — транспорт': trn2
+  },
   { collapsed:false }
 ).addTo(map);
 
@@ -50,56 +67,53 @@ const icons = {
 
 /* ===== данные ===== */
 fetch('data/points.geojson')
-  .then(r => r.json())
-  .then(json => {
-
-    /* --- раскладываем маркеры --- */
-    L.geoJSON(json, {
-      pointToLayer: (f, ll) => {
-        const cat = (f.properties.cat || 'buildings').toLowerCase();
-        return L.marker(ll, { icon: icons[cat] || icons.buildings });
+  .then(r=>r.json())
+  .then(json=>{
+    L.geoJSON(json,{
+      pointToLayer:(f,ll)=>{
+        const cat=(f.properties.cat||'buildings').toLowerCase();
+        return L.marker(ll,{icon:icons[cat]||icons.buildings});
       },
-      onEachFeature: (f, lyr) => {
-        const p = f.properties || {};
-      lyr.bindPopup(
-  `${p.img ? `<img class="popup-img" src="${p.img}" style="cursor:zoom-in"><br>` : ''}
-   <div class="popup-title">${p.name || ''}</div>
-   ${p.descr ? `<div class="popup-text">${p.descr}</div>` : ''}`
-); 
-        const lay = (p.layer || 'genplan').toLowerCase();
-        const cat = (p.cat   || 'buildings').toLowerCase();
+      onEachFeature:(f,lyr)=>{
+        const p=f.properties||{};
+        lyr.bindPopup(
+          `${p.img ? `<img class="popup-img" src="${p.img}" style="cursor:zoom-in"><br>` : ''}
+           <div class="popup-title">${p.name||''}</div>
+           ${p.descr ? `<div class="popup-text">${p.descr}</div>` : ''}`
+        );
+        const lay=(p.layer||'genplan').toLowerCase();
+        const cat=(p.cat  ||'buildings').toLowerCase();
         combo[lay][cat].addLayer(lyr);
       }
     });
 
-      /* ---------- контрол «Категории» ---------- */
+    /* --- контрол «Категории» --- */
     const catCtrl = L.control.layers(
       null,
       {
-        '<span class="legend-icon orange"></span> Здания'      : L.layerGroup(),
-        '<span class="legend-icon violet"></span> Благоустр.'  : L.layerGroup()
+        '<span class="legend-icon orange"></span> Здания'     : L.layerGroup(),
+        '<span class="legend-icon violet"></span> Благоустр.' : L.layerGroup()
       },
-      { collapsed:false, sanitize:false }
+      {collapsed:false, sanitize:false}
     ).addTo(map);
 
-    // проставляем галочки визуально
-    Object.values(catCtrl._layers).forEach(o => map.addLayer(o.layer));
+    /* включаем галочки визуально */
+    Object.values(catCtrl._layers).forEach(o=> map.addLayer(o.layer));
 
-    /* ---------- отображаем стартовый набор ---------- */
-    cats.forEach(c => map.addLayer(combo.genplan[c]));
+    /* стартовый набор маркеров */
+    cats.forEach(c=> map.addLayer(combo.genplan[c]));
 
-    /* ---------- реакция на смену подложки ---------- */
+    /* смена подложки */
     map.on('baselayerchange', e=>{
-      cats.forEach(c => map.removeLayer(combo[activeLayer][c]));
-      activeLayer = (e.name === 'Транспорт') ? 'transport' : 'genplan';
-
+      cats.forEach(c=> map.removeLayer(combo[activeLayer][c]));
+      activeLayer = (e.name==='Транспорт') ? 'transport' : 'genplan';
       Object.values(catCtrl._layers).forEach(o=>{
         const c = o.name.includes('Здания') ? 'buildings' : 'landscape';
         if(map.hasLayer(o.layer)) map.addLayer(combo[activeLayer][c]);
       });
     });
 
-    /* ---------- реакция на категории ---------- */
+    /* категории on/off */
     map.on('overlayadd',   e=>{
       const c = e.name.includes('Здания') ? 'buildings' : 'landscape';
       map.addLayer(combo[activeLayer][c]);
@@ -108,22 +122,25 @@ fetch('data/points.geojson')
       const c = e.name.includes('Здания') ? 'buildings' : 'landscape';
       map.removeLayer(combo[activeLayer][c]);
     });
-});   // ← ЭТО — закрывающая скобка fetch!
+  });
 
-/* ========= лайтбокс ========= */
+/* ===== лайтбокс ===== */
 function showLightbox(src){
   if(document.querySelector('.lb-overlay')) return;
   const w=document.createElement('div');
   w.className='lb-overlay';
   w.innerHTML = `<button class="lb-close">×</button><img src="${src}" alt="">`;
   document.body.appendChild(w);
-  w.querySelector('.lb-close').onclick=()=>w.remove();
-  w.onclick=e=>{ if(e.target===w) w.remove(); };
+  w.querySelector('.lb-close').onclick = ()=> w.remove();
+  w.onclick = e=>{ if(e.target===w) w.remove(); };
 }
 map.on('popupopen', e=>{
-  const img=e.popup._contentNode.querySelector('.popup-img');
-  if(img) img.addEventListener('click',()=>showLightbox(img.src));
+  const img = e.popup._contentNode.querySelector('.popup-img');
+  if(img) img.addEventListener('click', ()=> showLightbox(img.src));
 });
+
+
+
 
 
 
